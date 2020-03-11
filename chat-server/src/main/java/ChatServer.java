@@ -1,3 +1,5 @@
+import org.apache.log4j.Logger;
+
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.text.DateFormat;
@@ -9,6 +11,7 @@ public class ChatServer implements ServerSocketThreadListener, SocketThreadListe
     private final ChatServerListener listener;
     private ServerSocketThread server;
     private final DateFormat DATE_FORMAT = new SimpleDateFormat("HH:mm:ss: ");
+    final static Logger logger = Logger.getLogger(ChatServer.class);
 
     public static final int ACTIVITYTIMEOUT = 1200;
     private Vector<SocketThread> clients = new Vector<>();
@@ -20,7 +23,10 @@ public class ChatServer implements ServerSocketThreadListener, SocketThreadListe
     }
 
     public void start(int port) {
-        if (server != null && server.isAlive()) System.out.println("Server is already started");
+        if (server != null && server.isAlive()) {
+            System.out.println("Server is already started");
+            logger.warn("Trying to start server, while its already started");
+        }
 
         else {
             server = new ServerSocketThread(this, "Server", port, 2000);
@@ -47,6 +53,7 @@ public class ChatServer implements ServerSocketThreadListener, SocketThreadListe
                                 sleep(1000);
                             } catch (InterruptedException e) {
                                 putLog("Поток проверки не смог уснуть " + e.getMessage());
+                                logger.error("Поток проверки не смог уснуть " + e.getMessage());
                             }
                         }
                     }
@@ -61,6 +68,7 @@ public class ChatServer implements ServerSocketThreadListener, SocketThreadListe
     public void stop() {
         if (server == null || !server.isAlive()) {
             putLog("Server is not running");
+            logger.warn("Server is not running");
         } else {
             server.interrupt();
         }
@@ -80,12 +88,14 @@ public class ChatServer implements ServerSocketThreadListener, SocketThreadListe
     @Override
     public void onServerStart(ServerSocketThread thread) {
         putLog("Server thread started");
+        logger.info("Server thread started");
         SqlClient.connect();
     }
 
     @Override
     public void onServerStop(ServerSocketThread thread) {
         putLog("Server thread stopped");
+        logger.info("Server thread stopped");
         SqlClient.disconnect();
         for (int i = 0; i < clients.size(); i++) {
             clients.get(i).close();
@@ -96,6 +106,7 @@ public class ChatServer implements ServerSocketThreadListener, SocketThreadListe
     @Override
     public void onServerSocketCreated(ServerSocketThread thread, ServerSocket server) {
         putLog("Server socket created");
+        logger.info("Server socket created");
 
 
     }
@@ -109,6 +120,7 @@ public class ChatServer implements ServerSocketThreadListener, SocketThreadListe
     @Override
     public void onSocketAccepted(ServerSocketThread thread, ServerSocket server, Socket socket) {
         putLog("Client connected");
+        logger.info("Client connected from "+ socket.getInetAddress() + ":" + socket.getPort());
         String name = "SocketThread " + socket.getInetAddress() + ":" + socket.getPort();
         new ClientThread(this, name, socket);
 
@@ -127,6 +139,7 @@ public class ChatServer implements ServerSocketThreadListener, SocketThreadListe
     @Override
     public synchronized void onSocketStart(SocketThread thread, Socket socket) {
         putLog("Socket created");
+        logger.info("Socket created");
 
     }
 
@@ -140,10 +153,15 @@ public class ChatServer implements ServerSocketThreadListener, SocketThreadListe
                     client.getNickname() + " disconnected"));
         } else if (client.isRegistering()) {
             putLog("Неудачная попытка регистрации " + client.getSocket().toString());
+            logger.warn("Неудачная попытка регистрации " + client.getSocket().toString());
         } else if (client.isRenaming()) {
             putLog("Неудачная попытка изменения ника " + client.getSocket().toString());
-        } else
+            logger.warn("Неудачная попытка изменения ника " + client.getSocket().toString());
+        } else {
             putLog("Неудачная попытка входа на " + client.getSocket().toString() + ".\nСокет был закрыт по таймауту;");
+            logger.warn("Неудачная попытка входа на " + client.getSocket().toString() + ".\nСокет был закрыт по таймауту;");
+        }
+
 
         sendToAuthClients(Library.getUserList(getUsers()));
     }
@@ -185,10 +203,14 @@ public class ChatServer implements ServerSocketThreadListener, SocketThreadListe
                         sendToAuthClients(Library.getTypeBroadcast("Server", nick + " connected"));
                         sendToAuthClients(Library.getUserList(getUsers()));
                     }
-                    else putLog("Failed Register new user attemp at "+client);
+                    else {
+                        putLog("Failed Register new user attemp at "+client);
+                        logger.warn("Failed Register new user attemp at "+client);
+                    }
                 }
             } else {
                 putLog("Invalid login attempt: " + login);
+                logger.warn("Invalid login attempt: " + login);
                 client.authFail();
                 return;
             }
