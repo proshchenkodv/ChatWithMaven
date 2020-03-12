@@ -18,6 +18,7 @@
         <module>network</module>
         <module>chat-client</module>
         <module>chat-library</module>
+        <module>HW6</module>
     </modules>
 
 
